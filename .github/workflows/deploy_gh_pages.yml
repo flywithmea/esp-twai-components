@@ -97,6 +97,7 @@ jobs:
         with:
           name: docs-preview-pr-${{ github.event.pull_request.number }}
           path: docs_build_output
+          retention-days: 7
           if-no-files-found: error
 
       - name: Generate build summary

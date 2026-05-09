@@ -1,0 +1,193 @@
+name: Build Apps
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      idf_ver:
+        description: 'ESP-IDF versions as a JSON array, e.g. ["release-v5.4","latest"]'
+        required: false
+        default: '["release-v5.5","latest"]'
+
+permissions:
+  contents: read
+
+env:
+  DEFAULT_IDF_VERSIONS_JSON: '["release-v5.5","latest"]'
+  PIP_DISABLE_PIP_VERSION_CHECK: '1'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number && format('pr-{0}', github.event.pull_request.number) || format('ref-{0}', github.ref) }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  discover-apps:
+    name: Discover Buildable Apps
+    runs-on: ubuntu-latest
+    container: espressif/idf:latest
+    timeout-minutes: 20
+    outputs:
+      app_paths_json: ${{ steps.discover.outputs.app_paths_json }}
+      app_paths_text: ${{ steps.discover.outputs.app_paths_text }}
+      app_count: ${{ steps.discover.outputs.app_count }}
+      idf_versions: ${{ steps.set-matrix.outputs.idf_versions }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          submodules: 'recursive'
+
+      - name: Set matrix versions
+        id: set-matrix
+        env:
+          IDF_VERSIONS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.idf_ver || env.DEFAULT_IDF_VERSIONS_JSON }}
+        run: |
+          set -euo pipefail
+          {
+            echo 'idf_versions<<EOF'
+            printf '%s\n' "$IDF_VERSIONS"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install idf-ci
+        run: |
+          set -euo pipefail
+          . "${IDF_PATH}/export.sh"
+          python3 -m pip install --quiet idf-ci
+          python3 -c "import importlib.metadata; print(f\"idf-ci {importlib.metadata.version('idf-ci')}, esptool {importlib.metadata.version('esptool')}\")"
+
+      - name: Discover apps
+        id: discover
+        env:
+          COLLECT_OUTPUT_FILE: ${{ runner.temp }}/idf-ci-build-collect.json
+        run: |
+          set -euo pipefail
+          . "${IDF_PATH}/export.sh"
+          idf-ci build collect --paths . --format json --output "$COLLECT_OUTPUT_FILE"
+          app_paths_json=$(python3 tools/ci/discover_buildable_apps.py "$COLLECT_OUTPUT_FILE")
+          app_count=$(python3 -c 'import json,sys; print(len(json.loads(sys.argv[1])))' "$app_paths_json")
+          {
+            echo "app_count=${app_count}"
+            echo "app_paths_json=${app_paths_json}"
+            echo "app_paths_text<<EOF"
+            python3 -c 'import json,sys; print("\n".join(json.loads(sys.argv[1])))' "$app_paths_json"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate discovery summary
+        if: always()
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## App Discovery Summary"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|-----------|-------|"
+            echo "| **Apps Discovered** | ${{ steps.discover.outputs.app_count }} |"
+            echo "| **Status** | ${{ job.status }} |"
+            echo "| **Event** | ${{ github.event_name }} |"
+            echo "| **Branch** | ${{ github.ref_name }} |"
+            echo "| **Commit** | ${{ github.sha }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "${{ steps.discover.outputs.app_count }}" != "0" ]]; then
+            {
+              echo ""
+              echo "### Apps to Build"
+              echo ""
+              echo '```'
+              printf '%s\n' "${{ steps.discover.outputs.app_paths_text }}"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+
+          fi
+
+  build:
+    needs: discover-apps
+    if: needs.discover-apps.result == 'success' && needs.discover-apps.outputs.app_count != '0'
+    name: Build (ESP-IDF ${{ matrix.idf_ver }})
+    strategy:
+      fail-fast: false
+      matrix:
+        idf_ver: ${{ fromJson(needs.discover-apps.outputs.idf_versions) }}
+    runs-on: ubuntu-latest
+    container: espressif/idf:${{ matrix.idf_ver }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
+
+      - name: Install idf-ci
+        run: |
+          set -euo pipefail
+          . "${IDF_PATH}/export.sh"
+          python3 -m pip install --quiet idf-ci
+          python3 -c "import importlib.metadata; print(f\"idf-ci {importlib.metadata.version('idf-ci')}, esptool {importlib.metadata.version('esptool')}\")"
+
+      - name: Build apps
+        run: |
+          set -euo pipefail
+          . "${IDF_PATH}/export.sh"
+          echo "Building all discovered apps from repository root with ESP-IDF ${{ matrix.idf_ver }}..."
+          idf-ci build run --target all
+
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.idf_ver }}-${{ github.run_id }}
+          if-no-files-found: ignore
+          path: |
+            **/build_esp*/**/*.bin
+            **/build_esp*/**/*.elf
+            **/build_esp*/**/sdkconfig
+            **/build_esp*/**/sdkconfig.json
+            **/build_esp*/**/flasher_args.json
+            **/build_esp*/**/project_description.json
+            app_info_*.txt
+          retention-days: 7
+          compression-level: 6
+          overwrite: true
+
+      - name: Generate build step summary
+        if: always()
+        run: |
+          set -euo pipefail
+
+          STATUS="${{ job.status }}"
+          ICON="❓"
+          if [[ "$STATUS" == "success" ]]; then
+            ICON="✅"
+          elif [[ "$STATUS" == "failure" ]]; then
+            ICON="❌"
+          elif [[ "$STATUS" == "cancelled" ]]; then
+            ICON="⛔"
+          fi
+
+          {
+            echo "## Build Summary $ICON (ESP-IDF ${{ matrix.idf_ver }})"
+            echo ""
+            echo "| Parameter | Value |"
+            echo "|-----------|-------|"
+            echo "| **Apps** | ${{ needs.discover-apps.outputs.app_count }} |"
+            echo "| **ESP-IDF** | ${{ matrix.idf_ver }} |"
+            echo "| **Trigger** | ${{ github.event_name }} |"
+            echo "| **Branch** | ${{ github.ref_name }} |"
+            echo "| **Commit** | ${{ github.sha }} |"
+            echo "| **Status** | \`$STATUS\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

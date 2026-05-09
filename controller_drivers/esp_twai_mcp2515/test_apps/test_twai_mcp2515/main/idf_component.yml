@@ -1,0 +1,7 @@
+## IDF Component Manager Manifest File
+dependencies:
+  idf:
+    version: ">=5.5"
+  espressif/esp_twai_mcp2515:
+    version: "*"
+    override_path: "../../.."
