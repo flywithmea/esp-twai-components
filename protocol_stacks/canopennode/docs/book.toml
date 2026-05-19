@@ -1,0 +1,9 @@
+[book]
+title = "CANopenNode Programming Guide"
+language = "en"
+
+[output.html]
+default-theme = "light"
+git-repository-url = "https://github.com/espressif/esp-twai-components/tree/main/protocol_stacks/canopennode"
+edit-url-template = "https://github.com/espressif/esp-twai-components/edit/main/protocol_stacks/canopennode/docs/{path}"
+additional-js = ["mermaid-init.js"]

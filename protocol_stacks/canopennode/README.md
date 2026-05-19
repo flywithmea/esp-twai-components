@@ -7,6 +7,13 @@ This component is meant to be used as a library inside an ESP-IDF application.
 Application-specific Object Dictionary files and CANopen application behavior
 are still provided by the consuming project.
 
+## Documentation
+
+For detailed information about the CANopenNode component, including integration
+notes and example usage, please visit:
+
+- **Programming Guide**: [CANopenNode Documentation](https://espressif.github.io/esp-twai-components/latest/protocol_stacks/canopennode/index.html)
+
 ## Support
 
 Current CiA 301 coverage in this port:

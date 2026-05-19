@@ -3,5 +3,6 @@ description: CANopenNode protocol implementation for ESP-IDF
 url: https://github.com/espressif/esp-twai-components/tree/main/protocol_stacks/canopennode
 repository: https://github.com/espressif/esp-twai-components.git
 issues: https://github.com/espressif/esp-twai-components/issues
+documentation: https://espressif.github.io/esp-twai-components/latest/protocol_stacks/canopennode/index.html
 dependencies:
   idf: ">=5.5.4"
