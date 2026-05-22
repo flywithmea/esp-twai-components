@@ -103,11 +103,29 @@ def resolve_doxygen_xml_dir(
     return (base_dir / xml_output).resolve()
 
 
-def check_required_tools(components: list[pathlib.Path]) -> bool:
+def find_mdbook_preprocessor_commands(repo_root: pathlib.Path) -> set[str]:
+    """Collect mdBook preprocessor commands referenced in docs/book.toml files."""
+    commands: set[str] = set()
+    for book_toml in repo_root.glob("**/docs/book.toml"):
+        for raw_line in book_toml.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line.startswith("command = "):
+                continue
+            command = line.split("=", 1)[1].strip().strip('"').strip("'")
+            if command:
+                commands.add(command)
+    return commands
+
+
+def check_required_tools(
+    repo_root: pathlib.Path, components: list[pathlib.Path]
+) -> bool:
     """Ensure required external tools are available before building."""
     required_tools = {"mdbook"}
     if any((component / "docs" / "Doxyfile").exists() for component in components):
         required_tools.update({"doxygen", "esp-doxybook"})
+
+    required_tools.update(find_mdbook_preprocessor_commands(repo_root))
 
     missing = [tool for tool in sorted(required_tools) if shutil.which(tool) is None]
     if missing:
@@ -220,7 +238,7 @@ def build_all_docs(config: BuildConfig) -> bool:
         logger.warning("No component docs found")
         return True
 
-    if not check_required_tools(components):
+    if not check_required_tools(config.repo_root, components):
         return False
 
     if config.output_dir.exists():

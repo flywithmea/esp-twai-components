@@ -1,28 +1,39 @@
-(function () {
-    const renderMermaid = async () => {
-        const mermaidBlocks = document.querySelectorAll("pre code.language-mermaid");
-        if (mermaidBlocks.length === 0) {
-            return;
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+(() => {
+    const darkThemes = ['ayu', 'navy', 'coal'];
+    const lightThemes = ['light', 'rust'];
+
+    const classList = document.getElementsByTagName('html')[0].classList;
+
+    let lastThemeWasLight = true;
+    for (const cssClass of classList) {
+        if (darkThemes.includes(cssClass)) {
+            lastThemeWasLight = false;
+            break;
         }
+    }
 
-        const mermaid = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
-        mermaid.default.initialize({ startOnLoad: false });
+    const theme = lastThemeWasLight ? 'default' : 'dark';
+    mermaid.initialize({ startOnLoad: true, theme });
 
-        for (const [index, block] of mermaidBlocks.entries()) {
-            const source = block.textContent;
-            const container = document.createElement("div");
-            container.className = "mermaid";
-            container.textContent = source;
-            block.parentElement.replaceWith(container);
+    // Simplest way to make mermaid re-render the diagrams in the new theme is via refreshing the page
 
-            const { svg } = await mermaid.default.render(`mermaid-${index}`, source);
-            container.innerHTML = svg;
-        }
-    };
+    for (const darkTheme of darkThemes) {
+        document.getElementById(darkTheme).addEventListener('click', () => {
+            if (lastThemeWasLight) {
+                window.location.reload();
+            }
+        });
+    }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", renderMermaid);
-    } else {
-        renderMermaid();
+    for (const lightTheme of lightThemes) {
+        document.getElementById(lightTheme).addEventListener('click', () => {
+            if (!lastThemeWasLight) {
+                window.location.reload();
+            }
+        });
     }
 })();

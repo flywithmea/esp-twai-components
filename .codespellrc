@@ -1,6 +1,6 @@
 [codespell]
 ignore-words-list = crate,ot,ser,fo
-skip = *.bin,*.elf,*.git,.git,*.png,*.jpg,*.svg
+skip = *.bin,*.elf,*.git,.git,*.png,*.jpg,*.svg,**/mermaid.min.js
 quiet-level = 3
 count =
 write-changes = true

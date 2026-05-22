@@ -6,4 +6,9 @@ language = "en"
 default-theme = "light"
 git-repository-url = "https://github.com/espressif/esp-twai-components/tree/main/protocol_stacks/canopennode"
 edit-url-template = "https://github.com/espressif/esp-twai-components/edit/main/protocol_stacks/canopennode/docs/{path}"
-additional-js = ["mermaid-init.js"]
+additional-js = ["mermaid.min.js", "mermaid-init.js"]
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

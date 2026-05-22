@@ -12,6 +12,7 @@ This repository hosts reusable ESP-IDF components for TWAI (CAN) controller driv
 Install prerequisites:
 
 - `mdbook`
+- `mdbook-mermaid` (`cargo install mdbook-mermaid --locked`)
 - `doxygen`
 - `esp-doxybook` (`python3 -m pip install esp-doxybook`)
 
