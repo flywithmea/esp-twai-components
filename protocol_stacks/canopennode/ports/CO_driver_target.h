@@ -15,7 +15,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/portmacro.h"
 #include "esp_twai.h"
-
+#include "CO_config_user.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
